@@ -3,16 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>فحص كاميرا الآيفون</title>
+    <title>عرض الختم - آيفون AR</title>
     <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #111; margin: 0; }
-        a { padding: 20px 40px; background: #e74c3c; color: white; text-decoration: none; font-size: 20px; border-radius: 10px; font-family: sans-serif; font-weight: bold; }
+        body { 
+            display: flex; justify-content: center; align-items: center; 
+            height: 100vh; background: #111; margin: 0; font-family: sans-serif; 
+        }
+        
+        .ar-button {
+            padding: 20px 40px; font-size: 20px; font-weight: bold;
+            background: #27ae60; color: white; text-decoration: none;
+            border-radius: 15px; text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
 
-    <a rel="ar" href="https://developer.apple.com/augmented-reality/quick-look/models/stratocaster/fender_stratocaster.usdz">
-        🎸 افتح الكاميرا (اختبار أبل)
+    <a class="ar-button" rel="ar" href="cylinder_seal.usdz">
+        📷 افتح الكاميرا وضع الختم على الأرض
     </a>
 
 </body>
