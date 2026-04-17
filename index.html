@@ -3,26 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>عرض الختم - آيفون AR</title>
+    <title>تطبيق الواقع المعزز (AR)</title>
+    
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    
     <style>
-        body { 
-            display: flex; justify-content: center; align-items: center; 
-            height: 100vh; background: #111; margin: 0; font-family: sans-serif; 
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
         }
-        
-        .ar-button {
-            padding: 20px 40px; font-size: 20px; font-weight: bold;
-            background: #27ae60; color: white; text-decoration: none;
-            border-radius: 15px; text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+
+        /* جعل نافذة العرض تملأ الشاشة بالكامل */
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background-color: #eeeeee;
+        }
+
+        /* تصميم زر تشغيل الـ AR */
+        #ar-button {
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            border-radius: 25px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        #ar-button:active {
+            background-color: #f0f0f0;
         }
     </style>
 </head>
 <body>
 
-    <a class="ar-button" rel="ar" href="https://developer.apple.com/augmented-reality/quick-look/models/stratocaster/fender_stratocaster.usdz">
-    📷 افتح الكاميرا وضع الجيتار على الأرض
-</a>
+    <model-viewer 
+        src="cylinder_seal.glb"
+        ar 
+        ar-modes="webxr scene-viewer quick-look" 
+        camera-controls 
+        ar-placement="floor" 
+        environment-image="neutral"
+        alt="نموذج ختم أسطواني ثلاثي الأبعاد">
+        
+        <button slot="ar-button" id="ar-button">
+            افتح الكاميرا (AR)
+        </button>
+
+    </model-viewer>
 
 </body>
 </html>
