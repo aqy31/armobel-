@@ -2,143 +2,104 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>عرض الختم الأسطواني - AR</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>معاينة الختم الأسطواني - AR</title>
+
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
-        
-        /* الكاميرا بدون انعكاس (للكاميرا الخلفية) */
-        #video-background {
-            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            object-fit: cover; z-index: 1;
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1a1a1a; font-family: sans-serif; }
+
+        /* شاشة التحميل - تمنع استخدام الموقع حتى يكتمل التحميل */
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 9999;
+            color: white; transition: opacity 0.5s ease;
         }
-        
-        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; }
-        
-        #ui-overlay {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-            z-index: 10; text-align: center; width: 100%;
+
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #333;
+            border-top: 5px solid #e67e22; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
         }
-        
-        #start-btn {
-            padding: 15px 30px; font-size: 18px; font-weight: bold;
-            background: #27ae60; color: white; border: none; border-radius: 30px;
-            cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* حاوية العرض AR */
+        model-viewer {
+            width: 100%; height: 100vh;
+            --poster-color: transparent;
         }
-        
-        #status {
-            color: white; margin-top: 15px; font-size: 16px;
-            background: rgba(0,0,0,0.7); padding: 8px 20px; border-radius: 20px;
-            display: none; display: inline-block;
+
+        /* زر تفعيل الواقع المعزز */
+        #ar-button {
+            background-color: #e67e22; border-radius: 30px; border: none;
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            padding: 15px 35px; color: white; font-weight: bold; font-size: 18px;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none; /* يظهر فقط بعد التحميل */
         }
     </style>
 </head>
 <body>
 
-    <div id="ui-overlay">
-        <button id="start-btn">فتح الكاميرا الخلفية</button>
-        <br>
-        <div id="status" style="display: none;">جاري تشغيل الكاميرا وتتبع اليد...</div>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p id="loading-text">جاري تحميل الختم الأسطواني... 0%</p>
     </div>
-    
-    <video id="video-background" autoplay playsinline></video>
-    <div id="canvas-container"></div>
+
+    <model-viewer 
+        id="artifact-model"
+        src="cylinder_seal.glb" 
+        ar 
+        ar-modes="webxr scene-viewer quick-look" 
+        camera-controls 
+        touch-action="pan-y"
+        shadow-intensity="1" 
+        exposure="1.2"
+        auto-rotate
+        alt="A 3D model of a cylinder seal">
+        
+        <button slot="ar-button" id="ar-button">
+            اضغط هنا لوضع الختم على الأرض
+        </button>
+
+    </model-viewer>
 
     <script>
-        // 1. إعداد بيئة Three.js
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 8;
+        const modelViewer = document.querySelector('#artifact-model');
+        const overlay = document.querySelector('#loading-overlay');
+        const loadingText = document.querySelector('#loading-text');
+        const arButton = document.querySelector('#ar-button');
 
-        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-        // الإضاءة
-        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-        dirLight.position.set(5, 10, 5);
-        scene.add(dirLight);
-
-        // 2. تحميل الختم الأسطواني
-        let trackedObject = new THREE.Group();
-        scene.add(trackedObject);
-
-        const loader = new THREE.GLTFLoader();
-        loader.load('./cylinder_seal.glb', function (gltf) {
-            const model = gltf.scene;
-            model.scale.set(0.5, 0.5, 0.5); // حجم المجسم
-            model.rotation.x = Math.PI / 2; // تعديل زاوية العرض
-            trackedObject.add(model);
-            trackedObject.visible = false;
-        });
-
-        // 3. تتبع اليد وإحداثيات الكاميرا الخلفية
-        const videoElement = document.getElementById('video-background');
-        
-        function onResults(results) {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                trackedObject.visible = true;
-                const landmarks = results.multiHandLandmarks[0];
-                const palmCenter = landmarks[9]; // منتصف الكف
-                
-                // تم تعديل الإحداثيات هنا لتتناسب مع الكاميرا الخلفية (بدون وضع المرآة)
-                const x = (palmCenter.x - 0.5) * 12; 
-                const y = -(palmCenter.y - 0.5) * 8; 
-                
-                trackedObject.position.set(x, y, 0);
-                trackedObject.rotation.y += 0.02; // دوران خفيف لإظهار التفاصيل
-            } else {
-                trackedObject.visible = false;
-            }
-        }
-
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ 
-            maxNumHands: 1, 
-            modelComplexity: 1, 
-            minDetectionConfidence: 0.6, // تقليل النسبة قليلاً لتسريع اللقط على الموبايل
-            minTrackingConfidence: 0.6 
-        });
-        hands.onResults(onResults);
-
-        // 4. تشغيل الكاميرا الخلفية عند الضغط
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            document.getElementById('start-btn').style.display = 'none';
-            document.getElementById('status').style.display = 'inline-block';
-
-            const cameraUtils = new Camera(videoElement, {
-                onFrame: async () => { await hands.send({image: videoElement}); },
-                width: 1280, 
-                height: 720,
-                facingMode: 'environment' // هذا السطر هو المسؤول عن إجبار الكاميرا الخلفية
-            });
+        // تحديث نسبة التحميل
+        modelViewer.addEventListener('progress', (event) => {
+            const percent = Math.round(event.detail.totalProgress * 100);
+            loadingText.innerText = `جاري تحميل الختم الأسطواني... ${percent}%`;
             
-            cameraUtils.start().then(() => {
-                document.getElementById('status').style.display = 'none';
-            }).catch((err) => {
-                document.getElementById('status').innerText = "حدث خطأ في تشغيل الكاميرا: " + err;
-            });
+            if (percent >= 100) {
+                loadingText.innerText = "اكتمل التحميل! جاري التجهيز...";
+            }
         });
 
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
+        // إخفاء شاشة التحميل بمجرد أن يصبح المجسم جاهزاً تماماً
+        modelViewer.addEventListener('load', () => {
+            setTimeout(() => {
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    arButton.style.display = 'block';
+                }, 500);
+            }, 1000);
+        });
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        // التعامل مع أخطاء التحميل
+        modelViewer.addEventListener('error', (error) => {
+            loadingText.innerText = "فشل تحميل الملف. تأكد من وجود cylinder_seal.glb في المجلد.";
+            console.error(error);
         });
     </script>
+
 </body>
 </html>
