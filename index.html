@@ -2,35 +2,102 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تجربة الكاميرا - AR</title>
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>عرض الختم - الكاميرا المباشرة</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #1a1a1a; font-family: sans-serif; }
-        model-viewer { width: 100%; height: 100vh; }
-        #ar-button {
-            background-color: #27ae60; border-radius: 30px; border: none;
-            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
-            padding: 15px 35px; color: white; font-weight: bold; font-size: 18px;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        
+        /* الكاميرا الخلفية */
+        #video-background {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            object-fit: cover; z-index: 1;
+        }
+        
+        /* مشهد الـ 3D */
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; }
+        
+        /* زر التشغيل */
+        #ui-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; text-align: center; width: 100%; }
+        #start-btn {
+            padding: 20px 40px; font-size: 20px; font-weight: bold;
+            background: #e74c3c; color: white; border: none; border-radius: 10px;
+            cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
 
-    <model-viewer 
-        id="artifact-model"
-        src="https://modelviewer.dev/shared-assets/models/Astronaut.glb" 
-        ar 
-        ar-modes="webxr scene-viewer quick-look" 
-        camera-controls 
-        auto-rotate>
-        
-        <button slot="ar-button" id="ar-button">
-            افتح الكاميرا وضع المجسم على الأرض
-        </button>
+    <div id="ui-overlay">
+        <button id="start-btn">افتح الكاميرا واعرض القطعة</button>
+    </div>
+    
+    <video id="video-background" autoplay playsinline></video>
+    <div id="canvas-container"></div>
 
-    </model-viewer>
+    <script>
+        // 1. إعداد المشهد
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5; // قرب الكاميرا من القطعة
 
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // إضاءة قوية لإظهار تفاصيل الختم
+        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 10, 5);
+        scene.add(dirLight);
+
+        // 2. إضافة التحكم باللمس (التدوير والتكبير بالأصابع)
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; 
+        controls.dampingFactor = 0.05;
+
+        // 3. تحميل الختم الأسطواني
+        const loader = new THREE.GLTFLoader();
+        loader.load('./cylinder_seal.glb', function (gltf) {
+            const model = gltf.scene;
+            model.scale.set(0.5, 0.5, 0.5); // عدل هذا الرقم إذا كانت القطعة كبيرة أو صغيرة
+            scene.add(model);
+        });
+
+        // 4. تشغيل الكاميرا الخلفية (الطريقة التي نجحت معك)
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            document.getElementById('ui-overlay').style.display = 'none';
+            const videoElement = document.getElementById('video-background');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } // إجبار الكاميرا الخلفية
+                });
+                videoElement.srcObject = stream;
+            } catch (err) {
+                alert("تعذر فتح الكاميرا: " + err.message);
+            }
+        });
+
+        // حلقة التحديث
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // ضروري لحركة اللمس
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // تحديث الأبعاد عند تدوير الشاشة
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
 </html>
